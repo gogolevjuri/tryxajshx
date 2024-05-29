@@ -1,8 +1,10 @@
 import requests
 import time
 import json
+import threading
 import mysql.connector
 from mysql.connector import Error
+from flask import Flask, jsonify
 
 # Параметри підключення до бази даних
 DB_HOST = '192.168.77.11'
@@ -31,6 +33,11 @@ headers = {
     "priority": "u=1, i"
 }
 
+app = Flask(__name__)
+
+debug_messages = []
+status = {"running": True}
+
 
 def get_db_connection():
     try:
@@ -42,10 +49,10 @@ def get_db_connection():
             connection_timeout=10  # Додаємо тайм-аут для підключення до бази даних
         )
         if connection.is_connected():
-            print("Successfully connected to the database")
+            log_debug("Successfully connected to the database")
         return connection
     except Error as e:
-        print(f"Error while connecting to MySQL: {e}")
+        log_debug(f"Error while connecting to MySQL: {e}")
         return None
 
 
@@ -58,30 +65,30 @@ def get_debug_setting():
             result = cursor.fetchone()
             return result[0] == 1
     except Error as e:
-        print(f"Error while fetching debug setting: {e}")
+        log_debug(f"Error while fetching debug setting: {e}")
         return False
     finally:
         if connection and connection.is_connected():
             cursor.close()
             connection.close()
-            print("MySQL connection is closed")
+            log_debug("MySQL connection is closed")
 
 
 def execute_query(cursor, query, values=None, debug=False):
     try:
         if debug:
-            print("Executing query:", query)
-            print("With values:", values)
+            log_debug(f"Executing query: {query}")
+            log_debug(f"With values: {values}")
         cursor.execute(query, values)
         if debug:
-            print(f"Rows affected: {cursor.rowcount}")
+            log_debug(f"Rows affected: {cursor.rowcount}")
             if cursor.lastrowid:
-                print(f"Last inserted ID: {cursor.lastrowid}")
+                log_debug(f"Last inserted ID: {cursor.lastrowid}")
     except Error as e:
-        print(f"Error while executing query: {e}")
+        log_debug(f"Error while executing query: {e}")
         if debug:
-            print("Failed query:", query)
-            print("With values:", values)
+            log_debug(f"Failed query: {query}")
+            log_debug(f"With values: {values}")
 
 
 def get_cities_from_db(debug=False):
@@ -93,16 +100,16 @@ def get_cities_from_db(debug=False):
             execute_query(cursor, query, debug=debug)
             cities = cursor.fetchall()
             if debug:
-                print("Fetched cities:", cities)
+                log_debug(f"Fetched cities: {cities}")
             return cities
     except Error as e:
-        print(f"Error while connecting to MySQL: {e}")
+        log_debug(f"Error while connecting to MySQL: {e}")
         return []
     finally:
         if connection and connection.is_connected():
             cursor.close()
             connection.close()
-            print("MySQL connection is closed")
+            log_debug("MySQL connection is closed")
 
 
 def save_news_to_db(city_slug, news, debug=False):
@@ -145,7 +152,7 @@ def save_news_to_db(city_slug, news, debug=False):
                         )
                         execute_query(cursor, source_query, source_values, debug)
             connection.commit()
-            print(f"News and sources for {city_slug} saved to database at {time.strftime('%Y-%m-%d %H:%M:%S')}")
+            log_debug(f"News and sources for {city_slug} saved to database at {time.strftime('%Y-%m-%d %H:%M:%S')}")
 
             # Update prev_id in city_for_scan
             if max_news_id > 0:
@@ -153,15 +160,15 @@ def save_news_to_db(city_slug, news, debug=False):
                 update_prev_id_values = (max_news_id, city_slug)
                 execute_query(cursor, update_prev_id_query, update_prev_id_values, debug)
                 connection.commit()
-                print(f"Updated prev_id for {city_slug} to {max_news_id}")
+                log_debug(f"Updated prev_id for {city_slug} to {max_news_id}")
 
     except Error as e:
-        print(f"Error while executing query: {e}")
+        log_debug(f"Error while executing query: {e}")
     finally:
         if connection and connection.is_connected():
             cursor.close()
             connection.close()
-            print("MySQL connection is closed")
+            log_debug("MySQL connection is closed")
 
 
 def save_changes_to_db(city_slug, cluster_at, clusters_count, prev_id, debug=False):
@@ -173,14 +180,14 @@ def save_changes_to_db(city_slug, cluster_at, clusters_count, prev_id, debug=Fal
             values = (city_slug, cluster_at, clusters_count, prev_id)
             execute_query(cursor, query, values, debug)
             connection.commit()
-            print(f"Changes for {city_slug} saved to database at {time.strftime('%Y-%m-%d %H:%M:%S')}")
+            log_debug(f"Changes for {city_slug} saved to database at {time.strftime('%Y-%m-%d %H:%M:%S')}")
     except Error as e:
-        print(f"Error while executing query: {e}")
+        log_debug(f"Error while executing query: {e}")
     finally:
         if connection and connection.is_connected():
             cursor.close()
             connection.close()
-            print("MySQL connection is closed")
+            log_debug("MySQL connection is closed")
 
 
 def update_last_cluster_at(city_slug, new_cluster_at, debug=False):
@@ -192,14 +199,14 @@ def update_last_cluster_at(city_slug, new_cluster_at, debug=False):
             values = (new_cluster_at, city_slug)
             execute_query(cursor, query, values, debug)
             connection.commit()
-            print(f"Updated last_cluster_at for {city_slug} to {new_cluster_at}")
+            log_debug(f"Updated last_cluster_at for {city_slug} to {new_cluster_at}")
     except Error as e:
-        print(f"Error while executing query: {e}")
+        log_debug(f"Error while executing query: {e}")
     finally:
         if connection and connection.is_connected():
             cursor.close()
             connection.close()
-            print("MySQL connection is closed")
+            log_debug("MySQL connection is closed")
 
 
 def fetch_and_save(city_slug, last_cluster_at, prev_id, debug=False):
@@ -227,20 +234,42 @@ def fetch_and_save(city_slug, last_cluster_at, prev_id, debug=False):
             save_changes_to_db(city_slug, cluster_at, clusters_count, prev_id, debug)
             update_last_cluster_at(city_slug, cluster_at, debug)
         else:
-            print(f"No changes for {city_slug}")
+            log_debug(f"No changes for {city_slug}")
 
     except requests.exceptions.RequestException as e:
-        print(f"An error occurred during HTTP request for {city_slug}: {e}")
+        log_debug(f"An error occurred during HTTP request for {city_slug}: {e}")
     except Exception as e:
-        print(f"An error occurred for {city_slug}: {e}")
+        log_debug(f"An error occurred for {city_slug}: {e}")
+
+
+def log_debug(message):
+    global debug_messages
+    timestamp = time.strftime('%Y-%m-%d %H:%M:%S')
+    debug_message = f"[{timestamp}] {message}"
+    debug_messages.append(debug_message)
+    print(debug_message)
+    # Зберігаємо тільки останні 100 повідомлень
+    if len(debug_messages) > 100:
+        debug_messages = debug_messages[-100:]
+
+
+@app.route('/status')
+def status_route():
+    return jsonify(status)
+
+
+@app.route('/debug')
+def debug_route():
+    return jsonify(debug_messages[-10:])  # Показуємо останні 10 повідомлень
 
 
 def main():
     while True:
+        status["running"] = True
         debug = get_debug_setting()
         cities = get_cities_from_db(debug)
         if debug:
-            print("Cities:", cities)
+            log_debug(f"Cities: {cities}")
         for city in cities:
             city_slug, last_cluster_at, prev_id = city
             fetch_and_save(city_slug, last_cluster_at, prev_id, debug)
@@ -249,4 +278,9 @@ def main():
 
 
 if __name__ == "__main__":
+    # Запускаємо Flask сервер у окремому потоці
+    flask_thread = threading.Thread(target=lambda: app.run(host='0.0.0.0', port=5000))
+    flask_thread.start()
+
+    # Запускаємо основний процес
     main()
