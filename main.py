@@ -33,18 +33,26 @@ headers = {
 
 
 def get_db_connection():
-    return mysql.connector.connect(
-        host=DB_HOST,
-        database=DB_DATABASE,
-        user=DB_USER,
-        password=DB_PASSWORD
-    )
+    try:
+        connection = mysql.connector.connect(
+            host=DB_HOST,
+            database=DB_DATABASE,
+            user=DB_USER,
+            password=DB_PASSWORD,
+            connection_timeout=10  # Додаємо тайм-аут для підключення до бази даних
+        )
+        if connection.is_connected():
+            print("Successfully connected to the database")
+        return connection
+    except Error as e:
+        print(f"Error while connecting to MySQL: {e}")
+        return None
 
 
 def get_debug_setting():
     try:
         connection = get_db_connection()
-        if connection.is_connected():
+        if connection and connection.is_connected():
             cursor = connection.cursor()
             cursor.execute("SELECT debug FROM settings LIMIT 1")
             result = cursor.fetchone()
@@ -53,7 +61,7 @@ def get_debug_setting():
         print(f"Error while fetching debug setting: {e}")
         return False
     finally:
-        if connection.is_connected():
+        if connection and connection.is_connected():
             cursor.close()
             connection.close()
             print("MySQL connection is closed")
@@ -79,7 +87,7 @@ def execute_query(cursor, query, values=None, debug=False):
 def get_cities_from_db(debug=False):
     try:
         connection = get_db_connection()
-        if connection.is_connected():
+        if connection and connection.is_connected():
             cursor = connection.cursor()
             query = "SELECT city_slug, last_cluster_at, prev_id FROM city_for_scan"
             execute_query(cursor, query, debug=debug)
@@ -91,7 +99,7 @@ def get_cities_from_db(debug=False):
         print(f"Error while connecting to MySQL: {e}")
         return []
     finally:
-        if connection.is_connected():
+        if connection and connection.is_connected():
             cursor.close()
             connection.close()
             print("MySQL connection is closed")
@@ -100,7 +108,7 @@ def get_cities_from_db(debug=False):
 def save_news_to_db(city_slug, news, debug=False):
     try:
         connection = get_db_connection()
-        if connection.is_connected():
+        if connection and connection.is_connected():
             cursor = connection.cursor()
             max_news_id = 0
             for item in news:
@@ -150,7 +158,7 @@ def save_news_to_db(city_slug, news, debug=False):
     except Error as e:
         print(f"Error while executing query: {e}")
     finally:
-        if connection.is_connected():
+        if connection and connection.is_connected():
             cursor.close()
             connection.close()
             print("MySQL connection is closed")
@@ -159,7 +167,7 @@ def save_news_to_db(city_slug, news, debug=False):
 def save_changes_to_db(city_slug, cluster_at, clusters_count, prev_id, debug=False):
     try:
         connection = get_db_connection()
-        if connection.is_connected():
+        if connection and connection.is_connected():
             cursor = connection.cursor()
             query = """INSERT INTO chernihiv_changes (city_slug, cluster_at, clusters_count, prev_id) VALUES (%s, %s, %s, %s)"""
             values = (city_slug, cluster_at, clusters_count, prev_id)
@@ -169,7 +177,7 @@ def save_changes_to_db(city_slug, cluster_at, clusters_count, prev_id, debug=Fal
     except Error as e:
         print(f"Error while executing query: {e}")
     finally:
-        if connection.is_connected():
+        if connection and connection.is_connected():
             cursor.close()
             connection.close()
             print("MySQL connection is closed")
@@ -178,7 +186,7 @@ def save_changes_to_db(city_slug, cluster_at, clusters_count, prev_id, debug=Fal
 def update_last_cluster_at(city_slug, new_cluster_at, debug=False):
     try:
         connection = get_db_connection()
-        if connection.is_connected():
+        if connection and connection.is_connected():
             cursor = connection.cursor()
             query = """UPDATE city_for_scan SET last_cluster_at = %s WHERE city_slug = %s"""
             values = (new_cluster_at, city_slug)
@@ -188,7 +196,7 @@ def update_last_cluster_at(city_slug, new_cluster_at, debug=False):
     except Error as e:
         print(f"Error while executing query: {e}")
     finally:
-        if connection.is_connected():
+        if connection and connection.is_connected():
             cursor.close()
             connection.close()
             print("MySQL connection is closed")
@@ -197,7 +205,8 @@ def update_last_cluster_at(city_slug, new_cluster_at, debug=False):
 def fetch_and_save(city_slug, last_cluster_at, prev_id, debug=False):
     try:
         data = json.dumps({"section_slug": city_slug})
-        response = requests.post(url_changes, headers=headers, data=data)
+        response = requests.post(url_changes, headers=headers, data=data,
+                                 timeout=10)  # Додаємо тайм-аут для HTTP-запиту
         response.raise_for_status()  # Перевірка на статус код 200
         result = response.json()
 
@@ -208,7 +217,8 @@ def fetch_and_save(city_slug, last_cluster_at, prev_id, debug=False):
             time.sleep(30)
             # Виконати додатковий запит
             data_clusters = json.dumps({"section_slug": city_slug, "prev_id": prev_id})
-            response_clusters = requests.post(url_clusters_list, headers=headers, data=data_clusters)
+            response_clusters = requests.post(url_clusters_list, headers=headers, data=data_clusters,
+                                              timeout=10)  # Додаємо тайм-аут для HTTP-запиту
             response_clusters.raise_for_status()  # Перевірка на статус код 200
             result_clusters = response_clusters.json()
             news = result_clusters['data']
@@ -219,6 +229,8 @@ def fetch_and_save(city_slug, last_cluster_at, prev_id, debug=False):
         else:
             print(f"No changes for {city_slug}")
 
+    except requests.exceptions.RequestException as e:
+        print(f"An error occurred during HTTP request for {city_slug}: {e}")
     except Exception as e:
         print(f"An error occurred for {city_slug}: {e}")
 
