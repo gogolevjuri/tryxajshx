@@ -5,6 +5,8 @@ import threading
 import mysql.connector
 from mysql.connector import Error
 from flask import Flask, jsonify
+from requests.adapters import HTTPAdapter
+from requests.packages.urllib3.util.retry import Retry
 
 # Параметри підключення до бази даних
 DB_HOST = '192.168.77.11'
@@ -12,8 +14,8 @@ DB_DATABASE = 'monitoring'
 DB_USER = 'prizrakb2'
 DB_PASSWORD = '17101995aA'
 
-url_changes = "https://ukr.net/api/3/section/changes"
-url_clusters_list = "https://ukr.net/api/3/section/clusters/list"
+url_changes = "https://www.ukr.net/api/3/section/changes"
+url_clusters_list = "https://www.ukr.net/api/3/section/clusters/list"
 headers = {
     "Host": "www.ukr.net",
     "sec-ch-ua": "\"Google Chrome\";v=\"125\", \"Chromium\";v=\"125\", \"Not.A/Brand\";v=\"24\"",
@@ -24,11 +26,11 @@ headers = {
     "accept": "application/json, text/javascript, */*; q=0.01",
     "x-requested-with": "XMLHttpRequest",
     "sec-ch-ua-platform": "\"Windows\"",
-    "origin": "https://ukr.net",
+    "origin": "https://www.ukr.net",
     "sec-fetch-site": "same-origin",
     "sec-fetch-mode": "cors",
     "sec-fetch-dest": "empty",
-    "referer": "https://ukr.net/",
+    "referer": "https://www.ukr.net/",
     "accept-language": "ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7",
     "priority": "u=1, i"
 }
@@ -49,7 +51,7 @@ def get_db_connection():
             connection_timeout=10  # Додаємо тайм-аут для підключення до бази даних
         )
         if connection.is_connected():
-            log_debug("Successfully connected to the database!")
+            log_debug("Successfully connected to the database")
         return connection
     except Error as e:
         log_debug(f"Error while connecting to MySQL: {e}")
@@ -209,11 +211,31 @@ def update_last_cluster_at(city_slug, new_cluster_at, debug=False):
             log_debug("MySQL connection is closed")
 
 
+def requests_retry_session(
+        retries=3,
+        backoff_factor=0.3,
+        status_forcelist=(500, 502, 504),
+        session=None,
+):
+    session = session or requests.Session()
+    retry = Retry(
+        total=retries,
+        read=retries,
+        connect=retries,
+        backoff_factor=backoff_factor,
+        status_forcelist=status_forcelist,
+    )
+    adapter = HTTPAdapter(max_retries=retry)
+    session.mount('http://', adapter)
+    session.mount('https://', adapter)
+    return session
+
+
 def fetch_and_save(city_slug, last_cluster_at, prev_id, debug=False):
     try:
         data = json.dumps({"section_slug": city_slug})
-        response = requests.post(url_changes, headers=headers, data=data,
-                                 timeout=60)  # Додаємо тайм-аут для HTTP-запиту
+        session = requests_retry_session()
+        response = session.post(url_changes, headers=headers, data=data, timeout=30)
         response.raise_for_status()  # Перевірка на статус код 200
         result = response.json()
 
@@ -221,11 +243,9 @@ def fetch_and_save(city_slug, last_cluster_at, prev_id, debug=False):
         clusters_count = result['clusters_count']
 
         if cluster_at != last_cluster_at:
-            time.sleep(30)
             # Виконати додатковий запит
             data_clusters = json.dumps({"section_slug": city_slug, "prev_id": prev_id})
-            response_clusters = requests.post(url_clusters_list, headers=headers, data=data_clusters,
-                                              timeout=60)  # Додаємо тайм-аут для HTTP-запиту
+            response_clusters = session.post(url_clusters_list, headers=headers, data=data_clusters, timeout=120)
             response_clusters.raise_for_status()  # Перевірка на статус код 200
             result_clusters = response_clusters.json()
             news = result_clusters['data']
