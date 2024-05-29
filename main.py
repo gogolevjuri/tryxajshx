@@ -49,7 +49,7 @@ def get_db_connection():
             connection_timeout=10  # Додаємо тайм-аут для підключення до бази даних
         )
         if connection.is_connected():
-            log_debug("Successfully connected to the database")
+            log_debug("Successfully connected to the database!")
         return connection
     except Error as e:
         log_debug(f"Error while connecting to MySQL: {e}")
