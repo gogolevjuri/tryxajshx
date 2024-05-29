@@ -213,7 +213,7 @@ def fetch_and_save(city_slug, last_cluster_at, prev_id, debug=False):
     try:
         data = json.dumps({"section_slug": city_slug})
         response = requests.post(url_changes, headers=headers, data=data,
-                                 timeout=10)  # Додаємо тайм-аут для HTTP-запиту
+                                 timeout=60)  # Додаємо тайм-аут для HTTP-запиту
         response.raise_for_status()  # Перевірка на статус код 200
         result = response.json()
 
@@ -225,7 +225,7 @@ def fetch_and_save(city_slug, last_cluster_at, prev_id, debug=False):
             # Виконати додатковий запит
             data_clusters = json.dumps({"section_slug": city_slug, "prev_id": prev_id})
             response_clusters = requests.post(url_clusters_list, headers=headers, data=data_clusters,
-                                              timeout=10)  # Додаємо тайм-аут для HTTP-запиту
+                                              timeout=60)  # Додаємо тайм-аут для HTTP-запиту
             response_clusters.raise_for_status()  # Перевірка на статус код 200
             result_clusters = response_clusters.json()
             news = result_clusters['data']
