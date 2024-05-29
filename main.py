@@ -15,7 +15,7 @@ DB_PASSWORD = '17101995aA'
 url_changes = "https://ukr.net/api/3/section/changes"
 url_clusters_list = "https://ukr.net/api/3/section/clusters/list"
 headers = {
-    "Host": "ukr.net",
+    "Host": "www.ukr.net",
     "sec-ch-ua": "\"Google Chrome\";v=\"125\", \"Chromium\";v=\"125\", \"Not.A/Brand\";v=\"24\"",
     "sec-ch-ua-mobile": "?0",
     "x-content-language": "uk",
