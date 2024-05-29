@@ -12,10 +12,10 @@ DB_DATABASE = 'monitoring'
 DB_USER = 'prizrakb2'
 DB_PASSWORD = '17101995aA'
 
-url_changes = "https://www.ukr.net/api/3/section/changes"
-url_clusters_list = "https://www.ukr.net/api/3/section/clusters/list"
+url_changes = "https://ukr.net/api/3/section/changes"
+url_clusters_list = "https://ukr.net/api/3/section/clusters/list"
 headers = {
-    "Host": "www.ukr.net",
+    "Host": "ukr.net",
     "sec-ch-ua": "\"Google Chrome\";v=\"125\", \"Chromium\";v=\"125\", \"Not.A/Brand\";v=\"24\"",
     "sec-ch-ua-mobile": "?0",
     "x-content-language": "uk",
@@ -24,11 +24,11 @@ headers = {
     "accept": "application/json, text/javascript, */*; q=0.01",
     "x-requested-with": "XMLHttpRequest",
     "sec-ch-ua-platform": "\"Windows\"",
-    "origin": "https://www.ukr.net",
+    "origin": "https://ukr.net",
     "sec-fetch-site": "same-origin",
     "sec-fetch-mode": "cors",
     "sec-fetch-dest": "empty",
-    "referer": "https://www.ukr.net/",
+    "referer": "https://ukr.net/",
     "accept-language": "ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7",
     "priority": "u=1, i"
 }
