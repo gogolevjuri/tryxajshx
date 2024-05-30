@@ -133,7 +133,7 @@ def save_news_to_db(city_slug, news, debug=False):
                 execute_query(cursor, search_news_query, search_news_values, debug)
                 cn_result = cursor.fetchall()
                 if debug:
-                    log_debug(f"checked news stats: {cn_result}")
+                    log_debug(f"Checked news stats: {cn_result}")
 
                 execute_query(cursor, news_query, news_values, debug)
                 news_query = """INSERT INTO city_news (news_id, city_slug, created_at, title, link)
