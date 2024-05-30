@@ -121,6 +121,21 @@ def save_news_to_db(city_slug, news, debug=False):
             cursor = connection.cursor()
             max_news_id = 0
             for item in news:
+                search_news_query = """ SELECT 't1' as typer, COUNT(*) as ccc FROM city_news WHERE news_id=%s UNION SELECT 't2' as typer, COUNT(*) as ccc FROM city_news WHERE news_id=%s AND city_slug=%s AND created_at=%s AND title=%s and link=%s"""
+                search_news_values = (
+                    item['id'],
+                    item['id'],
+                    city_slug,
+                    item['created_at'],
+                    item['title'],
+                    item['link']
+                )
+                execute_query(cursor, search_news_query, search_news_values, debug)
+                cn_result = cursor.fetchall()
+                if debug:
+                    log_debug(f"checked news stats: {cn_result}")
+
+                execute_query(cursor, news_query, news_values, debug)
                 news_query = """INSERT INTO city_news (news_id, city_slug, created_at, title, link)
                                 VALUES (%s, %s, %s, %s, %s)"""
                 news_values = (
