@@ -311,7 +311,7 @@ def status_route():
 
 @app.route('/debug')
 def debug_route():
-    return jsonify(debug_messages[-10:])  # Показуємо останні 10 повідомлень
+    return jsonify(debug_messages[-100:])  # Показуємо останні 10 повідомлень
 
 
 def main():
