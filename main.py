@@ -134,18 +134,34 @@ def save_news_to_db(city_slug, news, debug=False):
                 cn_result = cursor.fetchall()
                 if debug:
                     log_debug(f"Checked news stats: {cn_result}")
+                tmp_count_all = cn_result[0][1]
+                tmp_count_curr = cn_result[1][1]
+                if tmp_count_all == 0:
+                    log_debug(f"NEED INSERT")
+                    news_query = """INSERT INTO city_news (news_id, city_slug, created_at, title, link)
+                                                    VALUES (%s, %s, %s, %s, %s)"""
+                    news_values = (
+                        item['id'],
+                        city_slug,
+                        item['created_at'],
+                        item['title'],
+                        item['link']
+                    )
+                    execute_query(cursor, news_query, news_values, debug)
+                elif tmp_count_all != tmp_count_curr:
+                    log_debug(f"NEDD UPDATE")
+                    news_query = """UPDATE city_news SET city_slug=%s, created_at=%s, title=%s, link=%s where news_id=%s LIMIT 1"""
+                    news_values = (
+                        city_slug,
+                        item['created_at'],
+                        item['title'],
+                        item['link'],
+                        item['id']
+                    )
+                    execute_query(cursor, news_query, news_values, debug)
+                else:
+                    log_debug(f"NEED IGNORE")
 
-                execute_query(cursor, news_query, news_values, debug)
-                news_query = """INSERT INTO city_news (news_id, city_slug, created_at, title, link)
-                                VALUES (%s, %s, %s, %s, %s)"""
-                news_values = (
-                    item['id'],
-                    city_slug,
-                    item['created_at'],
-                    item['title'],
-                    item['link']
-                )
-                execute_query(cursor, news_query, news_values, debug)
                 if item['id'] > max_news_id:
                     max_news_id = item['id']
 
