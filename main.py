@@ -119,7 +119,6 @@ def save_news_to_db(city_slug, news,prev_id, debug=False):
         connection = get_db_connection()
         if connection and connection.is_connected():
             cursor = connection.cursor()
-
             max_news_id = prev_id
             log_debug(f"maxid= {max_news_id}")
             # max_news_id = 0
