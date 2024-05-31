@@ -224,6 +224,116 @@ def save_changes_to_db(city_slug, cluster_at, clusters_count, prev_id, debug=Fal
             connection.close()
             log_debug("MySQL connection is closed")
 
+def save_news_to_db(city_slug, news,prev_id, debug=False):
+    try:
+        connection = get_db_connection()
+        if connection and connection.is_connected():
+            cursor = connection.cursor()
+            max_news_id = prev_id
+            log_debug(f"maxid= {max_news_id}")
+            # max_news_id = 0
+            for item in news:
+                search_news_query = """ SELECT 't1' as typer, COUNT(*) as ccc FROM city_news WHERE news_id=%s UNION SELECT 't2' as typer, COUNT(*) as ccc FROM city_news WHERE news_id=%s AND city_slug=%s AND created_at=%s AND title=%s and link=%s"""
+                search_news_values = (
+                    item['id'],
+                    item['id'],
+                    city_slug,
+                    item['created_at'],
+                    item['title'],
+                    item['link']
+                )
+                execute_query(cursor, search_news_query, search_news_values, debug)
+                cn_result = cursor.fetchall()
+                if debug:
+                    log_debug(f"Checked news stats: {cn_result}")
+                tmp_count_all = cn_result[0][1]
+                tmp_count_curr = cn_result[1][1]
+                if tmp_count_all == 0:
+                    log_debug(f"NEED INSERT")
+                    news_query = """INSERT INTO city_news (news_id, city_slug, created_at, title, link)
+                                                    VALUES (%s, %s, %s, %s, %s)"""
+                    news_values = (
+                        item['id'],
+                        city_slug,
+                        item['created_at'],
+                        item['title'],
+                        item['link']
+                    )
+                    execute_query(cursor, news_query, news_values, debug)
+                elif tmp_count_all != tmp_count_curr:
+                    log_debug(f"NEDD UPDATE")
+                    news_query = """UPDATE city_news SET city_slug=%s, created_at=%s, title=%s, link=%s where news_id=%s LIMIT 1"""
+                    news_values = (
+                        city_slug,
+                        item['created_at'],
+                        item['title'],
+                        item['link'],
+                        item['id']
+                    )
+                    execute_query(cursor, news_query, news_values, debug)
+                else:
+                    log_debug(f"NEED IGNORE")
+
+                if item['id'] > max_news_id:
+                    max_news_id = item['id']
+
+                if 'source' in item:
+                    for source in item['source']:
+                        article = source.get('article', {})
+                        source_query = """INSERT INTO news_sources (news_id, source_id, source_title, source_link, source_link_original, 
+                                        article_id, article_created_at, article_title, article_link, article_link_original)
+                                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"""
+                        source_values = (
+                            item['id'],
+                            source['id'],
+                            source['title'],
+                            source['link'],
+                            source.get('link_original'),
+                            article.get('id'),
+                            article.get('created_at'),
+                            article.get('title'),
+                            article.get('link'),
+                            article.get('link_original')
+                        )
+                        execute_query(cursor, source_query, source_values, debug)
+            connection.commit()
+            log_debug(f"News and sources for {city_slug} saved to database at {time.strftime('%Y-%m-%d %H:%M:%S')}")
+
+            # Update prev_id in city_for_scan
+            if max_news_id > 0:
+                update_prev_id_query = """UPDATE city_for_scan SET prev_id = %s WHERE city_slug = %s"""
+                update_prev_id_values = (max_news_id, city_slug)
+                execute_query(cursor, update_prev_id_query, update_prev_id_values, debug)
+                connection.commit()
+                log_debug(f"Updated prev_id for {city_slug} to {max_news_id}")
+
+    except Error as e:
+        log_debug(f"Error while executing query: {e}")
+    finally:
+        if connection and connection.is_connected():
+            cursor.close()
+            connection.close()
+            log_debug("MySQL connection is closed")
+
+
+def save_changes_to_db(city_slug, cluster_at, clusters_count, prev_id, debug=False):
+    try:
+        connection = get_db_connection()
+        if connection and connection.is_connected():
+            cursor = connection.cursor()
+            query = """INSERT INTO chernihiv_changes (city_slug, cluster_at, clusters_count, prev_id) VALUES (%s, %s, %s, %s)"""
+            values = (city_slug, cluster_at, clusters_count, prev_id)
+            execute_query(cursor, query, values, debug)
+            connection.commit()
+            log_debug(f"Changes for {city_slug} saved to database at {time.strftime('%Y-%m-%d %H:%M:%S')}")
+    except Error as e:
+        log_debug(f"Error while executing query: {e}")
+    finally:
+        if connection and connection.is_connected():
+            cursor.close()
+            connection.close()
+            log_debug("MySQL connection is closed")
+
 
 def update_last_cluster_at(city_slug, new_cluster_at, debug=False):
     try:
@@ -264,7 +374,7 @@ def requests_retry_session(
     return session
 
 
-def fetch_and_save(city_slug, last_cluster_at, prev_id, debug=False):
+def fetch_and_save(city_slug, last_cluster_at, prev_id,its_sec=False, debug=False):
     try:
         data = json.dumps({"section_slug": city_slug})
         session = requests_retry_session()
@@ -277,12 +387,16 @@ def fetch_and_save(city_slug, last_cluster_at, prev_id, debug=False):
 
         if cluster_at != last_cluster_at:
             # Виконати додатковий запит
-            data_clusters = json.dumps({"section_slug": city_slug, "prev_id": prev_id})
+            if its_sec:
+                data_clusters = json.dumps({"section_slug": city_slug, "prev_id": prev_id})
+            else:
+                data_clusters = json.dumps({"section_slug": city_slug})
             response_clusters = session.post(url_clusters_list, headers=headers, data=data_clusters, timeout=120)
             response_clusters.raise_for_status()  # Перевірка на статус код 200
             result_clusters = response_clusters.json()
             news = result_clusters['data']
             # Зберегти отримані дані
+            save_news_to_db(city_slug, news, prev_id, debug)
             save_news_to_db(city_slug, news, prev_id, debug)
             save_changes_to_db(city_slug, cluster_at, clusters_count, prev_id, debug)
             update_last_cluster_at(city_slug, cluster_at, debug)
@@ -325,7 +439,9 @@ def main():
             log_debug(f"Cities: {cities}")
         for city in cities:
             city_slug, last_cluster_at, prev_id = city
-            fetch_and_save(city_slug, last_cluster_at, prev_id, debug)
+            fetch_and_save(city_slug, last_cluster_at, prev_id,False, debug)
+            time.sleep(5)
+            fetch_and_save(city_slug, last_cluster_at, prev_id,True, debug)
             time.sleep(150)
         time.sleep(300)  # Чекаємо 5 хвилин (300 секунд) перед наступним запитом
 
