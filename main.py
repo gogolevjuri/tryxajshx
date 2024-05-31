@@ -388,8 +388,10 @@ def fetch_and_save(city_slug, last_cluster_at, prev_id,its_sec=False, debug=Fals
         if cluster_at != last_cluster_at:
             # Виконати додатковий запит
             if its_sec:
+                log_debug(f"its_sec = TRUE")
                 data_clusters = json.dumps({"section_slug": city_slug, "prev_id": prev_id})
             else:
+                log_debug(f"its_sec = FALSE")
                 data_clusters = json.dumps({"section_slug": city_slug})
             response_clusters = session.post(url_clusters_list, headers=headers, data=data_clusters, timeout=120)
             response_clusters.raise_for_status()  # Перевірка на статус код 200
