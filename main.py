@@ -139,7 +139,7 @@ def save_news_to_db(city_slug, news,prev_id, debug=False):
                 tmp_count_all = cn_result[0][1]
                 tmp_count_curr = cn_result[1][1]
                 if tmp_count_all == 0:
-                    log_debug(f"NEED INSERT")
+                    log_debug(f"NEED INSERT NEWS")
                     news_query = """INSERT INTO city_news (news_id, city_slug, created_at, title, link)
                                                     VALUES (%s, %s, %s, %s, %s)"""
                     news_values = (
@@ -151,7 +151,7 @@ def save_news_to_db(city_slug, news,prev_id, debug=False):
                     )
                     execute_query(cursor, news_query, news_values, debug)
                 elif tmp_count_all != tmp_count_curr:
-                    log_debug(f"NEDD UPDATE")
+                    log_debug(f"NEED UPDATE NEWS")
                     news_query = """UPDATE city_news SET city_slug=%s, created_at=%s, title=%s, link=%s where news_id=%s LIMIT 1"""
                     news_values = (
                         city_slug,
@@ -162,7 +162,7 @@ def save_news_to_db(city_slug, news,prev_id, debug=False):
                     )
                     execute_query(cursor, news_query, news_values, debug)
                 else:
-                    log_debug(f"NEED IGNORE")
+                    log_debug(f"NEED IGNORE NEWS")
 
                 if item['id'] > max_news_id:
                     max_news_id = item['id']
@@ -170,10 +170,14 @@ def save_news_to_db(city_slug, news,prev_id, debug=False):
                 if 'source' in item:
                     for source in item['source']:
                         article = source.get('article', {})
-                        source_query = """INSERT INTO news_sources (news_id, source_id, source_title, source_link, source_link_original, 
-                                        article_id, article_created_at, article_title, article_link, article_link_original)
-                                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"""
-                        source_values = (
+                        search_source_query = """ SELECT 't1' as typer, COUNT(*) as ccc FROM news_sources WHERE source_id=%s AND news_id=%s 
+                        UNION
+                        SELECT 't2' as typer, COUNT(*) as ccc FROM news_sources WHERE
+                         news_id=%s AND source_id=%s AND source_title=%s AND source_link=%s AND source_link_original=%s AND  
+                                        article_id=%s AND article_created_at=%s AND article_title=%s AND article_link=%s AND article_link_original=%s"""
+                        search_source_values = (
+                            source['id'],
+                            item['id'],
                             item['id'],
                             source['id'],
                             source['title'],
@@ -185,7 +189,52 @@ def save_news_to_db(city_slug, news,prev_id, debug=False):
                             article.get('link'),
                             article.get('link_original')
                         )
-                        execute_query(cursor, source_query, source_values, debug)
+                        execute_query(cursor, search_source_query, search_source_values, debug)
+                        cs_result = cursor.fetchall()
+                        if debug:
+                            log_debug(f"Checked source stats: {cs_result}")
+                        tmp_scount_all = cs_result[0][1]
+                        tmp_scount_curr = cs_result[1][1]
+                        if tmp_scount_all == 0:
+                            log_debug(f"NEED INSERT SOURCE")
+                            source_query = """INSERT INTO news_sources (news_id, source_id, source_title, source_link, source_link_original, 
+                                                                    article_id, article_created_at, article_title, article_link, article_link_original)
+                                                                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"""
+                            source_values = (
+                                item['id'],
+                                source['id'],
+                                source['title'],
+                                source['link'],
+                                source.get('link_original'),
+                                article.get('id'),
+                                article.get('created_at'),
+                                article.get('title'),
+                                article.get('link'),
+                                article.get('link_original')
+                            )
+                            execute_query(cursor, source_query, source_values, debug)
+                        elif tmp_scount_all != tmp_scount_curr:
+                            log_debug(f"NEED UPDATE SOURCE")
+                            source_query = """UPDATE news_sources set source_title=%s, source_link=%s, source_link_original=%s, 
+                                                                    article_id=%s, article_created_at=%s, article_title=%s, article_link=%s, article_link_original=%s 
+                                                                    WHERE news_id=%s AND source_id=%s LIMIT 1"""
+                            source_values = (
+                                source['title'],
+                                source['link'],
+                                source.get('link_original'),
+                                article.get('id'),
+                                article.get('created_at'),
+                                article.get('title'),
+                                article.get('link'),
+                                article.get('link_original'),
+                                item['id'],
+                                source['id']
+
+                            )
+                            execute_query(cursor, source_query, source_values, debug)
+                        else:
+                            log_debug(f"NEED IGNORE SOURCE")
+
             connection.commit()
             log_debug(f"News and sources for {city_slug} saved to database at {time.strftime('%Y-%m-%d %H:%M:%S')}")
 
