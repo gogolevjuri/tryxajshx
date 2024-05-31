@@ -114,12 +114,15 @@ def get_cities_from_db(debug=False):
             log_debug("MySQL connection is closed")
 
 
-def save_news_to_db(city_slug, news, debug=False):
+def save_news_to_db(city_slug, news,prev_id, debug=False):
     try:
         connection = get_db_connection()
         if connection and connection.is_connected():
             cursor = connection.cursor()
-            max_news_id = 0
+
+            max_news_id = prev_id
+            log_debug(f"maxid= {max_news_id}")
+            # max_news_id = 0
             for item in news:
                 search_news_query = """ SELECT 't1' as typer, COUNT(*) as ccc FROM city_news WHERE news_id=%s UNION SELECT 't2' as typer, COUNT(*) as ccc FROM city_news WHERE news_id=%s AND city_slug=%s AND created_at=%s AND title=%s and link=%s"""
                 search_news_values = (
@@ -281,7 +284,7 @@ def fetch_and_save(city_slug, last_cluster_at, prev_id, debug=False):
             result_clusters = response_clusters.json()
             news = result_clusters['data']
             # Зберегти отримані дані
-            save_news_to_db(city_slug, news, debug)
+            save_news_to_db(city_slug, news, prev_id, debug)
             save_changes_to_db(city_slug, cluster_at, clusters_count, prev_id, debug)
             update_last_cluster_at(city_slug, cluster_at, debug)
         else:
