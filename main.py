@@ -398,10 +398,11 @@ def fetch_and_save(city_slug, last_cluster_at, prev_id,its_sec=False, debug=Fals
             result_clusters = response_clusters.json()
             news = result_clusters['data']
             # Зберегти отримані дані
-            save_news_to_db(city_slug, news, prev_id, debug)
+            # save_news_to_db(city_slug, news, prev_id, debug)
             save_news_to_db(city_slug, news, prev_id, debug)
             save_changes_to_db(city_slug, cluster_at, clusters_count, prev_id, debug)
-            update_last_cluster_at(city_slug, cluster_at, debug)
+            if its_sec:
+                update_last_cluster_at(city_slug, cluster_at, debug)
         else:
             log_debug(f"No changes for {city_slug}")
 
