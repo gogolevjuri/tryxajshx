@@ -11,8 +11,8 @@ from requests.packages.urllib3.util.retry import Retry
 # Параметри підключення до бази даних
 DB_HOST = '192.168.77.11'
 DB_DATABASE = 'monitoring'
-DB_USER = 'prizrakb2'
-DB_PASSWORD = '17101995aA'
+DB_USER = 'prizrak'
+DB_PASSWORD = ''
 
 url_changes = "https://www.ukr.net/api/3/section/changes"
 url_clusters_list = "https://www.ukr.net/api/3/section/clusters/list"
