@@ -436,7 +436,7 @@ def fetch_and_save(city_slug, last_cluster_at, prev_id ,its_sec=False, debug=Fal
 
         if cluster_at != last_cluster_at:
             # Виконати додатковий запит
-            if its_sec:
+            if not its_sec:
                 log_debug(f"its_sec = TRUE")
                 data_clusters = json.dumps({"section_slug": city_slug, "prev_id": prev_id})
             else:
