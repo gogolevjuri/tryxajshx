@@ -114,7 +114,7 @@ def get_cities_from_db(debug=False):
             log_debug("MySQL connection is closed")
 
 
-def save_news_to_db(city_slug, news,prev_id, debug=False):
+def save_news_to_db(city_slug, news, prev_id, debug=False):
     try:
         connection = get_db_connection()
         if connection and connection.is_connected():
@@ -423,7 +423,7 @@ def requests_retry_session(
     return session
 
 
-def fetch_and_save(city_slug, last_cluster_at, prev_id,its_sec=False, debug=False):
+def fetch_and_save(city_slug, last_cluster_at, prev_id ,its_sec=False, debug=False):
     try:
         data = json.dumps({"section_slug": city_slug})
         session = requests_retry_session()
@@ -442,10 +442,13 @@ def fetch_and_save(city_slug, last_cluster_at, prev_id,its_sec=False, debug=Fals
             else:
                 log_debug(f"its_sec = FALSE")
                 data_clusters = json.dumps({"section_slug": city_slug})
+            log_debug(f"data_cluster={data_clusters}")
             response_clusters = session.post(url_clusters_list, headers=headers, data=data_clusters, timeout=120)
             response_clusters.raise_for_status()  # Перевірка на статус код 200
             result_clusters = response_clusters.json()
             news = result_clusters['data']
+            if debug:
+                log_debug(f"RESULT OF API GET = {result_clusters}")
             # Зберегти отримані дані
             # save_news_to_db(city_slug, news, prev_id, debug)
             save_news_to_db(city_slug, news, prev_id, debug)
@@ -479,7 +482,7 @@ def status_route():
 
 @app.route('/debug')
 def debug_route():
-    return jsonify(debug_messages[-100:])  # Показуємо останні 10 повідомлень
+    return jsonify(debug_messages[-10000:])  # Показуємо останні 10 повідомлень
 
 
 def main():
