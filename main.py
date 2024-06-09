@@ -234,6 +234,8 @@ def save_news_to_db(city_slug, news, prev_id, debug=False):
                             execute_query(cursor, source_query, source_values, debug)
                         else:
                             log_debug(f"NEED IGNORE SOURCE")
+                else:
+                    log_debug(f"NO SOURCE TRY TO GET CLUSTERS")
 
             connection.commit()
             log_debug(f"News and sources for {city_slug} saved to database at {time.strftime('%Y-%m-%d %H:%M:%S')}")
